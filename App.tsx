@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChefHat, Timer, Search, Sparkles, AlertCircle, ArrowLeft, Flame, Droplets, Camera } from 'lucide-react';
+import { ChefHat, Timer, Search, Sparkles, AlertCircle, ArrowLeft, Flame, Droplets, Camera, WifiOff } from 'lucide-react';
 import { generateRecipes, generateDishImage } from './services/geminiService';
 import { Recipe, CuisineType } from './types';
 import { MOCK_RECIPES } from './constants';
@@ -16,6 +16,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [imageLoading, setImageLoading] = useState(false);
   const [cookingMode, setCookingMode] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   // Preference State
   const [timeLimit, setTimeLimit] = useState<number | undefined>(undefined);
@@ -26,7 +27,7 @@ const App: React.FC = () => {
   // Generate Image when a recipe without image is selected
   useEffect(() => {
     const fetchImage = async () => {
-      if (view === 'DETAIL' && selectedRecipe && !selectedRecipe.imageUrl && process.env.API_KEY) {
+      if (view === 'DETAIL' && selectedRecipe && !selectedRecipe.imageUrl && process.env.API_KEY && !isDemoMode) {
         setImageLoading(true);
         const url = await generateDishImage(selectedRecipe.name);
         if (url) {
@@ -38,11 +39,12 @@ const App: React.FC = () => {
       }
     };
     fetchImage();
-  }, [view, selectedRecipe?.id]);
+  }, [view, selectedRecipe?.id, isDemoMode]);
 
   const handleSearch = async () => {
     setLoading(true);
     setView('RESULTS');
+    setIsDemoMode(false); // Reset demo mode
     try {
       if (process.env.API_KEY) {
         const generated = await generateRecipes({
@@ -51,14 +53,22 @@ const App: React.FC = () => {
           mood,
           desiredCuisine: selectedCuisines
         });
-        setRecipes(generated);
+        
+        if (generated.length > 0) {
+            setRecipes(generated);
+        } else {
+            // If API returns empty array but no error, mostly unlikely but handle it
+             throw new Error("No recipes generated");
+        }
       } else {
         console.warn("No API Key detected, using Mock data.");
         setRecipes(MOCK_RECIPES);
+        setIsDemoMode(true);
       }
     } catch (e) {
-      console.error(e);
+      console.error("AI Generation failed:", e);
       setRecipes(MOCK_RECIPES); // Fallback
+      setIsDemoMode(true);
     } finally {
       setLoading(false);
     }
@@ -87,7 +97,7 @@ const App: React.FC = () => {
               Dao Teng Life <span className="text-emerald-400">道騰生活-美食佳餚</span>
             </span>
           </div>
-          <div className="hidden md:block text-xs font-mono text-slate-500">美食佳餚DIY v1.2</div>
+          <div className="hidden md:block text-xs font-mono text-slate-500">美食佳餚DIY v1.3</div>
         </div>
       </header>
 
@@ -221,6 +231,19 @@ const App: React.FC = () => {
                 <button onClick={() => setView('SEARCH')} className="mr-4 p-2 bg-slate-800 rounded-full hover:bg-slate-700"><ArrowLeft className="w-5 h-5 text-slate-300" /></button>
                 <h2 className="text-2xl font-bold text-white">推薦結果</h2>
              </div>
+
+             {/* Demo Mode Alert */}
+             {isDemoMode && (
+                <div className="bg-yellow-500/10 border border-yellow-500/50 text-yellow-200 px-4 py-3 rounded-xl mb-6 flex items-start animate-in fade-in slide-in-from-top-2">
+                   <WifiOff className="w-5 h-5 mr-3 mt-0.5 flex-shrink-0" />
+                   <div>
+                      <p className="font-bold">目前顯示為展示資料 (Demo Data)</p>
+                      <p className="text-sm opacity-80 mt-1">
+                        系統無法連接至 AI 服務（可能是 API Key 未設定或網路連線問題）。因此無法根據您的食材（{ingredients || '無'}）生成新食譜，目前顯示的是預設範例。
+                      </p>
+                   </div>
+                </div>
+             )}
 
              {loading ? (
                <div className="flex flex-col items-center justify-center h-64 text-slate-500">

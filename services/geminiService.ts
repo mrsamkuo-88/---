@@ -13,6 +13,7 @@ Rules:
 4. Strictly follow the requested JSON schema.
 5. If the user gives a time limit, ensure totalTimeMinutes respects it.
 6. MANDATORY: Provide a dedicated 'sauce' section with ingredients and mixing instructions. The sauce is the soul of the dish.
+7. CRITICAL: If the user provides specific ingredients, the recipes MUST feature them as the main ingredient. Do not ignore user input.
 `;
 
 export const generateRecipes = async (prefs: UserPreferences): Promise<Recipe[]> => {
@@ -21,10 +22,18 @@ export const generateRecipes = async (prefs: UserPreferences): Promise<Recipe[]>
     
     // Construct prompt based on preferences
     let prompt = "請推薦 3 道適合新手的美味料理，請特別注重醬汁的調配與細節。";
-    if (prefs.ingredientsOnHand) prompt += ` 我手邊有: ${prefs.ingredientsOnHand}。`;
-    if (prefs.timeLimit) prompt += ` 我只有 ${prefs.timeLimit} 分鐘。`;
-    if (prefs.desiredCuisine && prefs.desiredCuisine.length > 0) prompt += ` 我想吃 ${prefs.desiredCuisine.join('或')}。`;
-    if (prefs.mood) prompt += ` 我的心情是: ${prefs.mood}。`;
+    
+    if (prefs.ingredientsOnHand && prefs.ingredientsOnHand.trim() !== '') {
+        prompt += ` 使用者指定冰箱現有食材: "${prefs.ingredientsOnHand}"。請務必在推薦的食譜中包含這些食材，並以此為核心設計菜單。`;
+    }
+    
+    if (prefs.timeLimit) prompt += ` 烹飪時間限制: ${prefs.timeLimit} 分鐘。`;
+    
+    if (prefs.desiredCuisine && prefs.desiredCuisine.length > 0) {
+        prompt += ` 使用者想吃的料理類型: ${prefs.desiredCuisine.join(' 或 ')}。`;
+    }
+    
+    if (prefs.mood) prompt += ` 使用者當前心情: ${prefs.mood}，請推薦符合此心境的菜餚。`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -128,7 +137,7 @@ export const generateDishImage = async (dishName: string): Promise<string | null
         model: 'gemini-2.5-flash-image',
         contents: {
           parts: [
-            { text: `A high-quality, professional food photography shot of ${dishName}. Delicious, appetizing, 4k resolution, studio lighting, beautiful plating. Close up.` }
+            { text: `A high-quality, professional food photography shot of ${dishName}. Delicious, appetizing, 4k resolution, studio lighting, beautiful plating. Close up. Food magazine style.` }
           ]
         },
         config: {
