@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChefHat, Timer, Search, Sparkles, AlertCircle, ArrowLeft, Flame, Droplets, Camera, WifiOff } from 'lucide-react';
+import { ChefHat, Timer, Search, Sparkles, AlertCircle, ArrowLeft, Flame, Droplets, Camera, WifiOff, RefreshCw } from 'lucide-react';
 import { generateRecipes, generateDishImage } from './services/geminiService';
 import { Recipe, CuisineType } from './types';
 import { MOCK_RECIPES } from './constants';
@@ -17,6 +17,7 @@ const App: React.FC = () => {
   const [imageLoading, setImageLoading] = useState(false);
   const [cookingMode, setCookingMode] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
+  const [errorDetails, setErrorDetails] = useState<string>('');
 
   // Preference State
   const [timeLimit, setTimeLimit] = useState<number | undefined>(undefined);
@@ -45,6 +46,8 @@ const App: React.FC = () => {
     setLoading(true);
     setView('RESULTS');
     setIsDemoMode(false); // Reset demo mode
+    setErrorDetails('');
+    
     try {
       if (process.env.API_KEY) {
         const generated = await generateRecipes({
@@ -57,18 +60,20 @@ const App: React.FC = () => {
         if (generated.length > 0) {
             setRecipes(generated);
         } else {
-            // If API returns empty array but no error, mostly unlikely but handle it
-             throw new Error("No recipes generated");
+             throw new Error("AI 回傳了空的食譜列表，請稍後再試。");
         }
       } else {
         console.warn("No API Key detected, using Mock data.");
         setRecipes(MOCK_RECIPES);
         setIsDemoMode(true);
+        setErrorDetails("環境變數 API_KEY 未設定，系統自動切換至展示模式。請檢查部署設定。");
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("AI Generation failed:", e);
       setRecipes(MOCK_RECIPES); // Fallback
       setIsDemoMode(true);
+      // Capture detailed error message for debugging on mobile
+      setErrorDetails(e.message || "網路連線異常或 API 配額已滿");
     } finally {
       setLoading(false);
     }
@@ -232,15 +237,32 @@ const App: React.FC = () => {
                 <h2 className="text-2xl font-bold text-white">推薦結果</h2>
              </div>
 
-             {/* Demo Mode Alert */}
+             {/* Demo Mode Alert with Diagnostics */}
              {isDemoMode && (
-                <div className="bg-yellow-500/10 border border-yellow-500/50 text-yellow-200 px-4 py-3 rounded-xl mb-6 flex items-start animate-in fade-in slide-in-from-top-2">
-                   <WifiOff className="w-5 h-5 mr-3 mt-0.5 flex-shrink-0" />
-                   <div>
-                      <p className="font-bold">目前顯示為展示資料 (Demo Data)</p>
-                      <p className="text-sm opacity-80 mt-1">
-                        系統無法連接至 AI 服務（可能是 API Key 未設定或網路連線問題）。因此無法根據您的食材（{ingredients || '無'}）生成新食譜，目前顯示的是預設範例。
-                      </p>
+                <div className="bg-yellow-500/10 border border-yellow-500/50 text-yellow-200 px-4 py-4 rounded-xl mb-6 animate-in fade-in slide-in-from-top-2">
+                   <div className="flex items-start">
+                     <WifiOff className="w-5 h-5 mr-3 mt-0.5 flex-shrink-0" />
+                     <div className="flex-1">
+                        <p className="font-bold text-lg">目前顯示為展示資料 (Demo Data)</p>
+                        <p className="text-sm opacity-90 mt-1 mb-3">
+                          系統無法連接至 AI 服務。因此無法根據您的食材（{ingredients || '無'}）生成新食譜。
+                        </p>
+                        {errorDetails && (
+                          <div className="bg-slate-900/50 p-3 rounded-lg border border-yellow-500/30 mb-3">
+                            <p className="text-xs text-slate-400 uppercase tracking-wider font-bold mb-1">Error Log:</p>
+                            <p className="text-xs text-red-300 font-mono break-all">
+                               {errorDetails}
+                            </p>
+                          </div>
+                        )}
+                        <button 
+                          onClick={handleSearch}
+                          className="text-sm bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-200 px-4 py-2 rounded-lg font-medium transition-colors flex items-center"
+                        >
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                          重試連線
+                        </button>
+                     </div>
                    </div>
                 </div>
              )}
