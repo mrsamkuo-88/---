@@ -16,9 +16,23 @@ Rules:
 7. CRITICAL: If the user provides specific ingredients, the recipes MUST feature them as the main ingredient. Do not ignore user input.
 `;
 
+// Helper to safely get API Key without crashing if process is undefined
+const getApiKey = (): string | undefined => {
+  try {
+    return typeof process !== 'undefined' ? process.env.API_KEY : undefined;
+  } catch (e) {
+    return undefined;
+  }
+};
+
 export const generateRecipes = async (prefs: UserPreferences): Promise<Recipe[]> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      throw new Error("API Key not configured");
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
     
     // Construct prompt based on preferences
     let prompt = "請推薦 3 道適合新手的美味料理，請特別注重醬汁的調配與細節。";
@@ -132,7 +146,10 @@ export const generateRecipes = async (prefs: UserPreferences): Promise<Recipe[]>
 
 export const generateDishImage = async (dishName: string): Promise<string | null> => {
   try {
-     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+     const apiKey = getApiKey();
+     if (!apiKey) return null;
+
+     const ai = new GoogleGenAI({ apiKey });
      const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
         contents: {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChefHat, Timer, Search, Sparkles, AlertCircle, ArrowLeft, Flame, Droplets, Camera, WifiOff, RefreshCw } from 'lucide-react';
+import { ChefHat, Timer, Search, Sparkles, AlertCircle, ArrowLeft, Flame, Droplets, Camera, WifiOff, RefreshCw, Smartphone } from 'lucide-react';
 import { generateRecipes, generateDishImage } from './services/geminiService';
 import { Recipe, CuisineType } from './types';
 import { MOCK_RECIPES } from './constants';
@@ -8,6 +8,15 @@ import TasteMatrix from './components/TasteMatrix';
 import CookingMode from './components/CookingMode';
 
 type ViewState = 'HOME' | 'SEARCH' | 'RESULTS' | 'DETAIL';
+
+// Helper for safe key access
+const hasApiKey = () => {
+  try {
+    return typeof process !== 'undefined' && !!process.env.API_KEY;
+  } catch {
+    return false;
+  }
+};
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('HOME');
@@ -28,7 +37,7 @@ const App: React.FC = () => {
   // Generate Image when a recipe without image is selected
   useEffect(() => {
     const fetchImage = async () => {
-      if (view === 'DETAIL' && selectedRecipe && !selectedRecipe.imageUrl && process.env.API_KEY && !isDemoMode) {
+      if (view === 'DETAIL' && selectedRecipe && !selectedRecipe.imageUrl && hasApiKey() && !isDemoMode) {
         setImageLoading(true);
         const url = await generateDishImage(selectedRecipe.name);
         if (url) {
@@ -49,7 +58,7 @@ const App: React.FC = () => {
     setErrorDetails('');
     
     try {
-      if (process.env.API_KEY) {
+      if (hasApiKey()) {
         const generated = await generateRecipes({
           timeLimit,
           ingredientsOnHand: ingredients,
@@ -64,9 +73,7 @@ const App: React.FC = () => {
         }
       } else {
         console.warn("No API Key detected, using Mock data.");
-        setRecipes(MOCK_RECIPES);
-        setIsDemoMode(true);
-        setErrorDetails("環境變數 API_KEY 未設定，系統自動切換至展示模式。請檢查部署設定。");
+        throw new Error("API Key 未設定 (Environment Variable Missing)");
       }
     } catch (e: any) {
       console.error("AI Generation failed:", e);
@@ -239,29 +246,45 @@ const App: React.FC = () => {
 
              {/* Demo Mode Alert with Diagnostics */}
              {isDemoMode && (
-                <div className="bg-yellow-500/10 border border-yellow-500/50 text-yellow-200 px-4 py-4 rounded-xl mb-6 animate-in fade-in slide-in-from-top-2">
+                <div className="bg-slate-800/80 border border-yellow-500/30 text-yellow-100 px-5 py-5 rounded-2xl mb-8 animate-in fade-in slide-in-from-top-2 shadow-xl shadow-yellow-900/10">
                    <div className="flex items-start">
-                     <WifiOff className="w-5 h-5 mr-3 mt-0.5 flex-shrink-0" />
+                     <div className="bg-yellow-500/10 p-2 rounded-full mr-4 shrink-0">
+                        <WifiOff className="w-6 h-6 text-yellow-400" />
+                     </div>
                      <div className="flex-1">
-                        <p className="font-bold text-lg">目前顯示為展示資料 (Demo Data)</p>
-                        <p className="text-sm opacity-90 mt-1 mb-3">
-                          系統無法連接至 AI 服務。因此無法根據您的食材（{ingredients || '無'}）生成新食譜。
+                        <h3 className="font-bold text-lg text-yellow-300 mb-1">已切換至展示模式 (Demo Mode)</h3>
+                        <p className="text-sm text-slate-300 mb-3 leading-relaxed">
+                          系統偵測到 AI 服務連線受限，這通常發生在手機瀏覽器或 API Key 未設定的環境。目前顯示為預設範例，無法根據您的食材（{ingredients || '無'}）生成新食譜。
                         </p>
+                        
                         {errorDetails && (
-                          <div className="bg-slate-900/50 p-3 rounded-lg border border-yellow-500/30 mb-3">
-                            <p className="text-xs text-slate-400 uppercase tracking-wider font-bold mb-1">Error Log:</p>
-                            <p className="text-xs text-red-300 font-mono break-all">
+                          <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800 mb-4 overflow-hidden">
+                            <div className="flex items-center text-xs text-slate-500 uppercase tracking-widest font-bold mb-2">
+                               <Smartphone className="w-3 h-3 mr-1" /> System Diagnostic Log
+                            </div>
+                            <code className="text-xs text-red-300 font-mono break-all block">
                                {errorDetails}
-                            </p>
+                            </code>
                           </div>
                         )}
-                        <button 
-                          onClick={handleSearch}
-                          className="text-sm bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-200 px-4 py-2 rounded-lg font-medium transition-colors flex items-center"
-                        >
-                          <RefreshCw className="w-4 h-4 mr-2" />
-                          重試連線
-                        </button>
+                        
+                        <div className="flex flex-wrap gap-3">
+                            <button 
+                              onClick={handleSearch}
+                              className="text-sm bg-yellow-500 hover:bg-yellow-400 text-slate-900 px-5 py-2 rounded-lg font-bold transition-colors flex items-center"
+                            >
+                              <RefreshCw className="w-4 h-4 mr-2" />
+                              重試連線
+                            </button>
+                            <a 
+                               href="https://ai.google.dev/gemini-api/docs/api-key" 
+                               target="_blank" 
+                               rel="noreferrer"
+                               className="text-sm border border-yellow-500/30 hover:bg-yellow-500/10 text-yellow-300 px-5 py-2 rounded-lg transition-colors"
+                            >
+                               檢查 API 設定
+                            </a>
+                        </div>
                      </div>
                    </div>
                 </div>
