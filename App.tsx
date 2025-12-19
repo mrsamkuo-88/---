@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChefHat, Timer, Search, Sparkles, AlertCircle, ArrowLeft, Flame, Droplets, Camera, WifiOff, RefreshCw, Smartphone } from 'lucide-react';
+import { ChefHat, Timer, Search, Sparkles, AlertCircle, ArrowLeft, Flame, Droplets, Camera, WifiOff, RefreshCw, Smartphone, Zap, ZapOff, Settings, Key } from 'lucide-react';
 import { generateRecipes, generateDishImage } from './services/geminiService';
 import { Recipe, CuisineType } from './types';
 import { MOCK_RECIPES } from './constants';
@@ -9,8 +9,13 @@ import CookingMode from './components/CookingMode';
 
 type ViewState = 'HOME' | 'SEARCH' | 'RESULTS' | 'DETAIL';
 
-// Helper for safe key access
+// Helper for safe key access (Local or Env)
 const hasApiKey = () => {
+  // Check LocalStorage first
+  if (typeof window !== 'undefined' && localStorage.getItem('gemini_api_key')) {
+    return true;
+  }
+  // Check Env
   try {
     return typeof process !== 'undefined' && !!process.env.API_KEY;
   } catch {
@@ -27,6 +32,19 @@ const App: React.FC = () => {
   const [cookingMode, setCookingMode] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string>('');
+  const [systemReady, setSystemReady] = useState(false);
+  const [showKeyInput, setShowKeyInput] = useState(false);
+  const [inputKey, setInputKey] = useState('');
+
+  // Initial System Check
+  useEffect(() => {
+    const ready = hasApiKey();
+    setSystemReady(ready);
+    // If not ready and not in demo mode, prompt for key
+    if (!ready) {
+      setShowKeyInput(true);
+    }
+  }, []);
 
   // Preference State
   const [timeLimit, setTimeLimit] = useState<number | undefined>(undefined);
@@ -51,6 +69,16 @@ const App: React.FC = () => {
     fetchImage();
   }, [view, selectedRecipe?.id, isDemoMode]);
 
+  const handleSaveKey = () => {
+    if (inputKey.trim()) {
+      localStorage.setItem('gemini_api_key', inputKey.trim());
+      setSystemReady(true);
+      setShowKeyInput(false);
+      // Optional: reload to ensure services pick it up cleanly
+      window.location.reload();
+    }
+  };
+
   const handleSearch = async () => {
     setLoading(true);
     setView('RESULTS');
@@ -72,15 +100,18 @@ const App: React.FC = () => {
              throw new Error("AI 回傳了空的食譜列表，請稍後再試。");
         }
       } else {
+        // Should not happen if UI is correct, but fail safe
         console.warn("No API Key detected, using Mock data.");
-        throw new Error("API Key 未設定 (Environment Variable Missing)");
+        throw new Error("API Key 未設定");
       }
     } catch (e: any) {
       console.error("AI Generation failed:", e);
       setRecipes(MOCK_RECIPES); // Fallback
       setIsDemoMode(true);
-      // Capture detailed error message for debugging on mobile
       setErrorDetails(e.message || "網路連線異常或 API 配額已滿");
+      if (e.message.includes("API Key")) {
+        setShowKeyInput(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -106,12 +137,77 @@ const App: React.FC = () => {
           <div className="flex items-center space-x-2 cursor-pointer" onClick={() => setView('HOME')}>
             <ChefHat className="w-8 h-8 text-emerald-400" />
             <span className="text-xl font-black tracking-tighter text-white">
-              Dao Teng Life <span className="text-emerald-400">道騰生活-美食佳餚</span>
+              Dao Teng Life <span className="text-emerald-400">道騰生活</span>
             </span>
           </div>
-          <div className="hidden md:block text-xs font-mono text-slate-500">美食佳餚DIY v1.3</div>
+          
+          <div className="flex items-center space-x-4">
+             {/* Connection Status Indicator */}
+             <div 
+               onClick={() => setShowKeyInput(true)}
+               className={`cursor-pointer flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-colors hover:bg-slate-800 ${systemReady ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}
+             >
+                {systemReady ? <Zap className="w-3 h-3 fill-current" /> : <ZapOff className="w-3 h-3" />}
+                <span className="hidden md:inline">{systemReady ? 'AI 連線正常' : '請設定 API Key'}</span>
+             </div>
+             
+             <button onClick={() => setShowKeyInput(true)} className="p-2 text-slate-400 hover:text-white transition-colors">
+               <Settings className="w-5 h-5" />
+             </button>
+          </div>
         </div>
       </header>
+
+      {/* API Key Modal */}
+      {showKeyInput && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+             <button onClick={() => setShowKeyInput(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white">
+               <span className="sr-only">Close</span>
+               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+             </button>
+             
+             <div className="flex items-center space-x-3 mb-4">
+               <div className="p-3 bg-emerald-500/10 rounded-full">
+                 <Key className="w-6 h-6 text-emerald-400" />
+               </div>
+               <h3 className="text-xl font-bold text-white">啟動智慧廚房</h3>
+             </div>
+             
+             <p className="text-slate-400 text-sm mb-6 leading-relaxed">
+               為了讓 AI 為您生成專屬食譜，請輸入您的 Google Gemini API Key。
+               <br/>
+               <span className="text-xs text-slate-500 mt-2 block">* 此金鑰僅儲存在您的瀏覽器中 (LocalStorage)，不會上傳至我們的主機。</span>
+             </p>
+             
+             <div className="space-y-4">
+               <div>
+                 <label className="block text-slate-300 text-sm font-bold mb-2">API Key</label>
+                 <input 
+                   type="password" 
+                   value={inputKey}
+                   onChange={(e) => setInputKey(e.target.value)}
+                   placeholder="AIzaSy..."
+                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-sm"
+                 />
+               </div>
+               
+               <button 
+                 onClick={handleSaveKey}
+                 className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-bold rounded-xl transition-colors shadow-lg shadow-emerald-500/20"
+               >
+                 儲存並連線
+               </button>
+               
+               <div className="text-center">
+                 <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-xs text-emerald-400 hover:text-emerald-300 underline">
+                   還沒有 Key? 點此免費申請
+                 </a>
+               </div>
+             </div>
+          </div>
+        </div>
+      )}
 
       <main className="max-w-7xl mx-auto px-4 pt-8">
         
@@ -254,7 +350,9 @@ const App: React.FC = () => {
                      <div className="flex-1">
                         <h3 className="font-bold text-lg text-yellow-300 mb-1">已切換至展示模式 (Demo Mode)</h3>
                         <p className="text-sm text-slate-300 mb-3 leading-relaxed">
-                          系統偵測到 AI 服務連線受限，這通常發生在手機瀏覽器或 API Key 未設定的環境。目前顯示為預設範例，無法根據您的食材（{ingredients || '無'}）生成新食譜。
+                          系統偵測到 AI 服務連線受限。
+                          <br />
+                          若您是訪客，請點擊右上角「設定」圖示輸入 Key。
                         </p>
                         
                         {errorDetails && (
@@ -270,20 +368,12 @@ const App: React.FC = () => {
                         
                         <div className="flex flex-wrap gap-3">
                             <button 
-                              onClick={handleSearch}
+                              onClick={() => setShowKeyInput(true)}
                               className="text-sm bg-yellow-500 hover:bg-yellow-400 text-slate-900 px-5 py-2 rounded-lg font-bold transition-colors flex items-center"
                             >
-                              <RefreshCw className="w-4 h-4 mr-2" />
-                              重試連線
+                              <Key className="w-4 h-4 mr-2" />
+                              輸入 API Key
                             </button>
-                            <a 
-                               href="https://ai.google.dev/gemini-api/docs/api-key" 
-                               target="_blank" 
-                               rel="noreferrer"
-                               className="text-sm border border-yellow-500/30 hover:bg-yellow-500/10 text-yellow-300 px-5 py-2 rounded-lg transition-colors"
-                            >
-                               檢查 API 設定
-                            </a>
                         </div>
                      </div>
                    </div>

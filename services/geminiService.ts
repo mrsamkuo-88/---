@@ -16,8 +16,15 @@ Rules:
 7. CRITICAL: If the user provides specific ingredients, the recipes MUST feature them as the main ingredient. Do not ignore user input.
 `;
 
-// Helper to safely get API Key without crashing if process is undefined
+// Helper to safely get API Key from LocalStorage (Client) or Env (Build/Server)
 const getApiKey = (): string | undefined => {
+  // 1. Check LocalStorage (User manually entered key)
+  if (typeof window !== 'undefined') {
+    const localKey = localStorage.getItem('gemini_api_key');
+    if (localKey) return localKey;
+  }
+
+  // 2. Check Environment Variable
   try {
     return typeof process !== 'undefined' ? process.env.API_KEY : undefined;
   } catch (e) {
