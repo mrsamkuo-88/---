@@ -26,7 +26,7 @@ const getApiKey = (): string | undefined => {
 
   // 2. Check Environment Variable
   try {
-    return typeof process !== 'undefined' ? process.env.API_KEY : undefined;
+    return typeof process !== 'undefined' ? process.env.API_KEY : AIzaSyA8O6OhT3PL0lchc415sTCEqYU85iWrP5U;
   } catch (e) {
     return undefined;
   }
